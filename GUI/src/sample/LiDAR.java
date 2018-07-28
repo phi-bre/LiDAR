@@ -1,6 +1,6 @@
 package sample;
 
-import gnu.io.*;
+import com.fazecast.jSerialComm.SerialPort;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,15 +8,63 @@ import java.io.OutputStream;
 
 public class LiDAR {
 
-    private String port;
+    public static final int BAUDRATE = 115200;
+    public static final String COM = "COM3";
 
+    private SerialPort comPort;
+    private OutputStream os;
+    private InputStream is;
+    private boolean connected;
 
-    public LiDAR(String port) {
-        this.port = port;
+    private Thread thread;
+
+    public LiDAR() {
+        thread = new Thread(() -> {
+            while (connected) {
+                try {
+                    if (is.available() > 0) {
+                        byte[] buffer = new byte[6];
+                        is.read(buffer, 0, buffer.length);
+
+                        int d = ((buffer[0] & 0xFF) << 8) | (buffer[1] & 0xFF);
+                        int s = ((buffer[2] & 0xFF) << 8) | (buffer[3] & 0xFF);
+                        int a = ((buffer[4] & 0xFF) << 8) | (buffer[5] & 0xFF);
+
+                        System.out.println("Distance: " + d + " Strength: " + s + " Angle: " + a);
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public void connect() {
+        comPort = SerialPort.getCommPorts()[0];
+        comPort.setBaudRate(BAUDRATE);
+        comPort.openPort();
+        comPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 100, 0);
+        is = comPort.getInputStream();
+        os = comPort.getOutputStream();
+        connected = true;
+        thread.start();
+    }
+
+    public void disconnect() {
+        comPort.closePort();
+        connected = false;
     }
 
     public Measurement readMeasurement() {
-        // TODO
+        /*try {
+            for (int i = 0; i < 100; i++) {
+                os.write(2);
+                os.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        */
         return null;
     }
 
@@ -24,76 +72,4 @@ public class LiDAR {
 
     }
 
-    public static class SerialReader implements Runnable {
-        InputStream in;
-
-        public SerialReader(InputStream in) {
-            this.in = in;
-        }
-
-        public void run() {
-            byte[] buffer = new byte[1024];
-            int len = -1;
-            try {
-                while ((len = this.in.read(buffer)) > -1) {
-                    System.out.print(new String(buffer, 0, len));
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public static class SerialWriter implements Runnable {
-        OutputStream out;
-
-        public SerialWriter(OutputStream out) {
-            this.out = out;
-        }
-
-        public void run() {
-            try {
-                int c = 0;
-                while ((c = System.in.read()) > -1) {
-                    this.out.write(c);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    public void connect() {
-        CommPortIdentifier portIdentifier;
-        try {
-            portIdentifier = CommPortIdentifier.getPortIdentifier(port);
-            if (portIdentifier.isCurrentlyOwned()) {
-                System.out.println("Error: Port is currently in use");
-            } else {
-                CommPort commPort = portIdentifier.open(this.getClass().getName(), 2000);
-
-                if (commPort instanceof SerialPort) {
-                    SerialPort serialPort = (SerialPort) commPort;
-                    serialPort.setSerialPortParams(57600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE);
-
-                    InputStream in = serialPort.getInputStream();
-                    OutputStream out = serialPort.getOutputStream();
-
-                    (new Thread(new SerialReader(in))).start();
-                    (new Thread(new SerialWriter(out))).start();
-
-                } else {
-                    System.out.println("Error: Specified port is not a serial port.");
-                }
-            }
-        } catch (NoSuchPortException e) {
-            e.printStackTrace();
-        } catch (UnsupportedCommOperationException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (PortInUseException e) {
-            e.printStackTrace();
-        }
-    }
 }

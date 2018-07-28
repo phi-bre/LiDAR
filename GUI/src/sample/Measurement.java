@@ -2,12 +2,12 @@ package sample;
 
 public class Measurement {
 
-    private int distance, signal;
+    private int distance, strength;
     private double angle;
 
-    public Measurement(int distance, int signal, double angle) {
+    public Measurement(int distance, int strength, double angle) {
         this.distance = distance;
-        this.signal = signal;
+        this.strength = strength;
         this.angle = angle;
     }
 
@@ -15,8 +15,8 @@ public class Measurement {
         return distance;
     }
 
-    public int getSignal() {
-        return signal;
+    public int getStrength() {
+        return strength;
     }
 
     public double getAngle() {
